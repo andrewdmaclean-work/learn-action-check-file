@@ -86,6 +86,8 @@ runs:
         }' \
         -u "$ACCOUNT_SID:$AUTH_TOKEN")
 
+      echo "Response: $RESPONSE"
+
       HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
       RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
 
