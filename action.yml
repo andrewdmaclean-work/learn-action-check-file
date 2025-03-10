@@ -1,16 +1,16 @@
 name: "Check file with Webhook"
 description: "Check file for expected changes and send content to a webhook."
 inputs:
-  stepfile:
+  step:
     description: "Step document file to send."
     required: true
-  submissionfile:
+  submission:
     description: "Submission file to send."
     required: true
-  solutionfile:
+  solution:
     description: "Solution file to send."
     required: true
-  webhookurl:
+  webhook:
     description: "URL of the webhook."
     required: true
   authtoken:
@@ -29,10 +29,10 @@ runs:
   steps:
   - shell: bash
     env:
-      STEPFILE: ${{ inputs.stepfile }}
-      SUBMISSIONFILE: ${{ inputs.submissionfile }}
-      SOLUTIONFILE: ${{ inputs.solutionfile }}
-      WEBHOOKURL: ${{ inputs.webhookurl }}
+      STEPFILE: ${{ inputs.step }}
+      SUBMISSIONFILE: ${{ inputs.submission }}
+      SOLUTIONFILE: ${{ inputs.solution }}
+      WEBHOOKURL: ${{ inputs.webhook }}
       AUTH_TOKEN: ${{ inputs.authtoken }}
       ACCOUNT_SID: ${{ inputs.accountsid }}
       GITHUB_USER_EMAIL: ${{ github.actor }}
