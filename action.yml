@@ -13,12 +13,17 @@ inputs:
   webhookurl:
     description: "URL of the webhook."
     required: true
-  auth_token:
+  authtoken:
     description: "Auth token for Twilio authentication."
     required: true
-  account_sid:
+  accountsid:
     description: "Account SID for Twilio authentication."
     required: true
+outputs:
+  assessment:
+    description: "True if the solution is correct"
+  reason:
+    description: "Reason for assessment"
 runs:
   using: composite
   steps:
@@ -28,9 +33,10 @@ runs:
       SUBMISSIONFILE: ${{ inputs.submissionfile }}
       SOLUTIONFILE: ${{ inputs.solutionfile }}
       WEBHOOKURL: ${{ inputs.webhookurl }}
-      AUTH_TOKEN: ${{ inputs.auth_token }}
-      ACCOUNT_SID: ${{ inputs.account_sid }}
+      AUTH_TOKEN: ${{ inputs.authtoken }}
+      ACCOUNT_SID: ${{ inputs.accountsid }}
       GITHUB_USER_EMAIL: ${{ github.actor }}
+      OUTPUT_ENV: $GITHUB_ENV
     run: |
       echo "Checking that all required env variables are set"
 
@@ -86,6 +92,14 @@ runs:
       if [ "$HTTP_STATUS" -eq 200 ]; then
         echo "Request successfully sent to webhook"
         echo "Response body: $RESPONSE_BODY"
+
+        ASSESSMENT=$(echo "$RESPONSE_BODY" | jq -r '.assessment')
+        REASON=$(echo "$RESPONSE_BODY" | jq -r '.reason')
+
+        # Set outputs for the action
+        echo "assessment=$ASSESSMENT" >> $OUTPUT_ENV
+        echo "reason=$REASON" >> $OUTPUT_ENV
+
       else
         echo "Failed to send request to webhook. HTTP status code: $HTTP_STATUS"
         echo "Response body: $RESPONSE_BODY"
