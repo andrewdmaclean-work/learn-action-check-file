@@ -13,6 +13,12 @@ inputs:
   webhookurl:
     description: "URL of the webhook."
     required: true
+  auth_token:
+    description: "Auth token for Twilio authentication."
+    required: true
+  account_sid:
+    description: "Account SID for Twilio authentication."
+    required: true
 runs:
   using: composite
   steps:
@@ -22,50 +28,64 @@ runs:
       SUBMISSIONFILE: ${{ inputs.submissionfile }}
       SOLUTIONFILE: ${{ inputs.solutionfile }}
       WEBHOOKURL: ${{ inputs.webhookurl }}
+      AUTH_TOKEN: ${{ inputs.auth_token }}
+      ACCOUNT_SID: ${{ inputs.account_sid }}
+      GITHUB_USER_EMAIL: ${{ github.actor }}
     run: |
       echo "Checking that all required env variables are set"
 
-      # Check each file environment variable and if the file is valid
-      if [ -z "$STEPFILE" ] || [ ! -f "$STEPFILE" ]; then
-        echo "STEPFILE is invalid or does not exist"
+      # Verify file existence
+      if [ ! -f "$STEPFILE" ]; then
+        echo "STEPFILE does not exist"
         exit 1
       fi
-      if [ -z "$SUBMISSIONFILE" ] || [ ! -f "$SUBMISSIONFILE" ]; then
-        echo "SUBMISSIONFILE is invalid or does not exist"
+      if [ ! -f "$SUBMISSIONFILE" ]; then
+        echo "SUBMISSIONFILE does not exist"
         exit 1
       fi
-      if [ -z "$SOLUTIONFILE" ] || [ ! -f "$SOLUTIONFILE" ]; then
-        echo "SOLUTIONFILE is invalid or does not exist"
+      if [ ! -f "$SOLUTIONFILE" ]; then
+        echo "SOLUTIONFILE does not exist"
         exit 1
       fi
       if [ -z "$WEBHOOKURL" ]; then
-        echo "WEBHOOKURL is unset or set to the empty string"
+        echo "WEBHOOKURL is unset or empty"
+        exit 1
+      fi
+      if [ -z "$AUTH_TOKEN" ]; then
+        echo "AUTH_TOKEN is unset or empty"
+        exit 1
+      fi
+      if [ -z "$ACCOUNT_SID" ]; then
+        echo "ACCOUNT_SID is unset or empty"
         exit 1
       fi
 
-      echo "Converting file contents to text strings"
-
-      # Read file contents securely
+      echo "Reading file contents"
       step_content=$(<"$STEPFILE")
       submission_content=$(<"$SUBMISSIONFILE")
       solution_content=$(<"$SOLUTIONFILE")
 
       echo "Sending request to $WEBHOOKURL"
 
-      # Send data to webhook and capture response body and status code
       RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$WEBHOOKURL" \
         -H "Content-Type: application/json" \
-        -H "Authorization: Bearer ${{ secrets.API_TOKEN }}" \
-        -d "{\"step\": \"$step_content\", \"submission\": \"$submission_content\", \"solution\": \"$solution_content\"}")
+        -d '{
+          "identity": "email:'"${GITHUB_USER_EMAIL}"'",
+          "session_id": "mysession",
+          "body": {
+            "step": "'"${step_content}"'",
+            "submission": "'"${submission_content}"'",
+            "solution": "'"${solution_content}"'"
+          }
+        }' \
+        -u "$ACCOUNT_SID:$AUTH_TOKEN")
 
-      # Extract HTTP status code from response
       HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
       RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
 
-      # Check HTTP response status
       if [ "$HTTP_STATUS" -eq 200 ]; then
-          echo "Request successfully sent to webhook"
-          echo "Response body: $RESPONSE_BODY"
+        echo "Request successfully sent to webhook"
+        echo "Response body: $RESPONSE_BODY"
       else
         echo "Failed to send request to webhook. HTTP status code: $HTTP_STATUS"
         echo "Response body: $RESPONSE_BODY"
