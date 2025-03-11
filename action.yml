@@ -27,9 +27,8 @@ outputs:
     description: "Reason for assessment"
     value: ${{ steps.request.outputs.reason }}
 runs:
-  using: composite
+  using: "composite"
   steps:
-  - shell: bash
   - id: request
     env:
       STEPFILE: ${{ inputs.step }}
@@ -39,6 +38,7 @@ runs:
       AUTH_TOKEN: ${{ inputs.authtoken }}
       ACCOUNT_SID: ${{ inputs.accountsid }}
       GITHUB_USER_EMAIL: ${{ github.actor }}
+    shell: bash
     run: |
       echo "Checking that all required environment variables are set"
 
