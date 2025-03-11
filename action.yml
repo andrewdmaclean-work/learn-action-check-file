@@ -65,7 +65,7 @@ runs:
       # Store the curl command in a variable
       CURL_COMMAND="curl -s -w \"\n%{http_code}\" -X POST \"$WEBHOOKURL\" \
         -H \"Content-Type: application/json\" \
-        -d '{\"identity\": \"email:${GITHUB_USER_EMAIL}\", \"session_id\": \"mysession\", \"body\": { \"step\": \"${step_content}\", \"submission\": \"${submission_content}\", \"solution\": \"${solution_content}\" }}' \
+        -d "{ \"identity\": \"email:${GITHUB_USER_EMAIL}\", \"session_id\": \"mysession\", \"body\": \"{ \\\"step\\\": \\\"${step_content}\\\", \\\"submission\\\": \\\"${submission_content}\\\", \\\"solution\\\": \\\"${solution_content}\\\" }\" }"
         -u \"$ACCOUNT_SID:$AUTH_TOKEN\""
 
       # Echo the curl command for debugging
