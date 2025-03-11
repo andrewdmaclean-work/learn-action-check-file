@@ -1,138 +1,130 @@
-name: Check file with Webhook
+name: "Check file with Webhook"
+description: "Check file for expected changes and send content to a webhook."
+inputs:
+  step:
+    description: "Step document file to send."
+    required: true
+  submission:
+    description: "Submission file to send."
+    required: true
+  solution:
+    description: "Solution file to send."
+    required: true
+  webhook:
+    description: "URL of the webhook."
+    required: true
+  authtoken:
+    description: "Auth token for Twilio authentication."
+    required: true
+  accountsid:
+    description: "Account SID for Twilio authentication."
+    required: true
+outputs:
+  assessment:
+    description: "True if the solution is correct"
+  reason:
+    description: "Reason for assessment"
+runs:
+  using: composite
+  steps:
+  - shell: bash
+    env:
+      STEPFILE: ${{ inputs.step }}
+      SUBMISSIONFILE: ${{ inputs.submission }}
+      SOLUTIONFILE: ${{ inputs.solution }}
+      WEBHOOKURL: ${{ inputs.webhook }}
+      AUTH_TOKEN: ${{ inputs.authtoken }}
+      ACCOUNT_SID: ${{ inputs.accountsid }}
+      GITHUB_USER_EMAIL: ${{ github.actor }}
+    run: |
+      echo "Checking that all required environment variables are set"
 
-on:
-  workflow_call:
-    outputs:
-      solutionassessment:
-        description: "Assessment"
-        value: ${{ jobs.check_solution.outputs.solutionassessment }}
-      solutionreason:
-        description: "Reason"
-        value: ${{ jobs.check_solution.outputs.solutionreason }}
+      # Verify required files exist
+      for file in "$STEPFILE" "$SUBMISSIONFILE" "$SOLUTIONFILE"; do
+        if [ ! -f "$file" ]; then
+          echo "❌ Error: File $file does not exist"
+          exit 1
+        fi
+      done
 
-jobs:
-  check_solution:
-    name: Check Solution
-    runs-on: ubuntu-latest
-    inputs:
-      step:
-        description: "Step document file to send."
-        required: true
-      submission:
-        description: "Submission file to send."
-        required: true
-      solution:
-        description: "Solution file to send."
-        required: true
-      webhook:
-        description: "URL of the webhook."
-        required: true
-      authtoken:
-        description: "Auth token for Twilio authentication."
-        required: true
-      accountsid:
-        description: "Account SID for Twilio authentication."
-        required: true
-    outputs:
-      solutionassessment: ${{ steps.step1.outputs.assessment }}
-      solutionreason: ${{ steps.step1.outputs.reason }}
-    steps:
-      - shell: bash
-      - id: step1
-        env:
-          STEPFILE: ${{ inputs.step }}
-          SUBMISSIONFILE: ${{ inputs.submission }}
-          SOLUTIONFILE: ${{ inputs.solution }}
-          WEBHOOKURL: ${{ inputs.webhook }}
-          AUTH_TOKEN: ${{ inputs.authtoken }}
-          ACCOUNT_SID: ${{ inputs.accountsid }}
-          GITHUB_USER_EMAIL: ${{ github.actor }}
-        run: |
-          echo "Checking that all required environment variables are set"
+      for var in WEBHOOKURL AUTH_TOKEN ACCOUNT_SID; do
+        if [ -z "${!var}" ]; then
+          echo "❌ Error: $var is unset or empty"
+          exit 1
+        fi
+      done
 
-          # Verify required files exist
-          for file in "$STEPFILE" "$SUBMISSIONFILE" "$SOLUTIONFILE"; do
-            if [ ! -f "$file" ]; then
-              echo "❌ Error: File $file does not exist"
-              exit 1
-            fi
-          done
+      # Function to clean file content
+      clean_content() {
+        if [ -f "$1" ]; then
+          # Read the content, remove carriage returns and excess spaces, and escape quotes
+          tr -d '\r\n' < "$1" | tr -s ' ' | sed 's/"/\\"/g'
+        else
+          echo "⚠️ File $1 not found"
+        fi
+      }
 
-          for var in WEBHOOKURL AUTH_TOKEN ACCOUNT_SID; do
-            if [ -z "${!var}" ]; then
-              echo "❌ Error: $var is unset or empty"
-              exit 1
-            fi
-          done
+      # Read and clean file contents
+      echo "Reading and formatting file contents..."
+      step_content=$(clean_content "$STEPFILE")
+      solution_content=$(clean_content "$SOLUTIONFILE")
+      submission_content=$(clean_content "$SUBMISSIONFILE")
 
-          # Function to clean file content
-          clean_content() {
-            if [ -f "$1" ]; then
-              # Read the content, remove carriage returns and excess spaces, and escape quotes
-              tr -d '\r\n' < "$1" | tr -s ' ' | sed 's/"/\\"/g'
-            else
-              echo "⚠️ File $1 not found"
-            fi
-          }
+      uuid=$(uuidgen)
+      ASSESSMENT_CONTENT="Instructions_${uuid}: ${step_content} Solution_${uuid}: ${solution_content} Submission_${uuid}: ${submission_content}"
 
-          # Read and clean file contents
-          echo "Reading and formatting file contents..."
-          step_content=$(clean_content "$STEPFILE")
-          solution_content=$(clean_content "$SOLUTIONFILE")
-          submission_content=$(clean_content "$SUBMISSIONFILE")
+      # Create the JSON payload, correctly escaping special characters
+      JSON_PAYLOAD=$(printf '{"identity": "email:%s", "session_id": "mysession", "body": "%s"}' \
+        "${GITHUB_USER_EMAIL}" \
+        "${ASSESSMENT_CONTENT}")
 
-          uuid=$(uuidgen)
-          ASSESSMENT_CONTENT="Instructions_${uuid}: ${step_content} Solution_${uuid}: ${solution_content} Submission_${uuid}: ${submission_content}"
+      echo "Sending request to $WEBHOOKURL"
 
-          # Create the JSON payload, correctly escaping special characters
-          JSON_PAYLOAD=$(printf '{"identity": "email:%s", "session_id": "mysession", "body": "%s"}' \
-            "${GITHUB_USER_EMAIL}" \
-            "${ASSESSMENT_CONTENT}")
+      # Store the curl command in a variable for debugging
+      CURL_COMMAND="curl -s -w \"\n%{http_code}\" -X POST \"$WEBHOOKURL\" \
+        -H \"Content-Type: application/json\" \
+        -d '$JSON_PAYLOAD' \
+        -u \"$ACCOUNT_SID:$AUTH_TOKEN\""
 
-          echo "Sending request to $WEBHOOKURL"
+      # Echo the curl command for debugging
+      echo "Running the following cURL command:"
+      echo "$CURL_COMMAND"
 
-          # Store the curl command in a variable for debugging
-          CURL_COMMAND="curl -s -w \"\n%{http_code}\" -X POST \"$WEBHOOKURL\" \
-            -H \"Content-Type: application/json\" \
-            -d '$JSON_PAYLOAD' \
-            -u \"$ACCOUNT_SID:$AUTH_TOKEN\""
+      # Execute the stored curl command and capture the response
+      RESPONSE=$(eval "$CURL_COMMAND")
 
-          # Echo the curl command for debugging
-          echo "Running the following cURL command:"
-          echo "$CURL_COMMAND"
+      # Extract the HTTP status code (last line) and body (everything else)
+      HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+      BODY=$(echo "$RESPONSE" | sed '$d')
 
-          # Execute the stored curl command and capture the response
-          RESPONSE=$(eval "$CURL_COMMAND")
+      # Print debugging information
+      echo "HTTP Status Code: $HTTP_CODE"
+      echo "Response Body: $BODY"
 
-          # Extract the HTTP status code (last line) and body (everything else)
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-          BODY=$(echo "$RESPONSE" | sed '$d')
+      if [ "$HTTP_CODE" -eq 200 ]; then
+        echo "✅ Request successfully sent to webhook"
 
-          # Print debugging information
-          echo "HTTP Status Code: $HTTP_CODE"
-          echo "Response Body: $BODY"
+       # Parsing the response right after a successful call
+      echo "Parsing Response"
 
-          if [ "$HTTP_CODE" -eq 200 ]; then
-            echo "✅ Request successfully sent to webhook"
+      # Extract the nested JSON string from the "body" field using jq
+      JSON_BODY=$(echo "$BODY" | jq -r '.body')
 
-            echo "Parsing Response"
+      # Parse the assessment and reason from the nested JSON using jq
+      ASSESSMENT=$(echo "$JSON_BODY" | jq -r '.assessment')
+      REASON=$(echo "$JSON_BODY" | jq -r '.reason')
 
-            # Extract the nested JSON string from the "body" field using jq
-            JSON_BODY=$(echo "$BODY" | jq -r '.body')
+      # Print extracted values
+      echo "Assessment: $ASSESSMENT"
+      echo "Reason: $REASON"
 
-            # Parse the assessment and reason from the nested JSON using jq
-            ASSESSMENT=$(echo "$JSON_BODY" | jq -r '.assessment')
-            REASON=$(echo "$JSON_BODY" | jq -r '.reason')
+      # Output the assessment and reason as action outputs
+      echo "assessment=$ASSESSMENT" >> $GITHUB_OUTPUT
+      echo "reason=$REASON" >> $GITHUB_OUTPUT
 
-            # Print extracted values
-            echo "Assessment: $ASSESSMENT"
-            echo "Reason: $REASON"
+      cat $GITHUB_OUTPUT
 
-            # Output the assessment and reason as action outputs
-            echo "assessment=$ASSESSMENT" >> $GITHUB_OUTPUT
-            echo "reason=$REASON" >> $GITHUB_OUTPUT
-
-          else
-            echo "❌ Failed to send request to webhook. HTTP status code: $HTTP_CODE"
-            exit 1
-          fi
+      else
+        echo "❌ Failed to send request to webhook. HTTP status code: $HTTP_CODE"
+        exit 1
+      fi
