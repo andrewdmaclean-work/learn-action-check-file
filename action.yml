@@ -28,6 +28,7 @@ runs:
   using: composite
   steps:
   - shell: bash
+  - id: assessment
     env:
       STEPFILE: ${{ inputs.step }}
       SUBMISSIONFILE: ${{ inputs.submission }}
