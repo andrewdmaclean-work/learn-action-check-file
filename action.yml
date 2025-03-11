@@ -70,14 +70,13 @@ runs:
       solution_content=$(clean_content "$SOLUTIONFILE")
       submission_content=$(clean_content "$SUBMISSIONFILE")
 
-      # Concatenate with titles and format newlines to be JSON compatible
-      all_content=$(printf "Instructions: %s \\n\\nSolution: %s \\n\\nSubmission: %s" \
-        "$step_content" "$solution_content" "$submission_content")
+      uuid=$(uuidgen)
+      ASSESSMENT_CONTENT="Instructions_${uuid}: ${step_content} Solution_${uuid}: ${solution_content} Submission_${uuid}: ${submission_content}"
 
       # Create the JSON payload, correctly escaping special characters
       JSON_PAYLOAD=$(printf '{"identity": "email:%s", "session_id": "mysession", "body": "%s"}' \
         "${GITHUB_USER_EMAIL}" \
-        "${all_content}")
+        "${ASSESSMENT_CONTENT}")
 
       echo "Sending request to $WEBHOOKURL"
 
