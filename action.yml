@@ -102,17 +102,26 @@ runs:
       echo "Response Body: $BODY"
 
       if [ "$HTTP_CODE" -eq 200 ]; then
-        echo "✅ Request successfully sent to webhook"
+         echo "✅ Request successfully sent to webhook"
 
-        # Parsing the response right after a successful call
-        echo "Parsing Response"
+        # Extract JSON from the response body
+        JSON_BODY=$(echo "$BODY" | sed -n 's/.*"body": *"\([^}]*\)}.*/\1}/p')
 
-        # Extract JSON from the response body (removing markdown code block)
-        JSON_BODY=$(echo "$BODY" | sed -n 's/.*```json\(.*\)```/\1/p')
+        # Ensure JSON_BODY is not empty
+        if [ -z "$JSON_BODY" ]; then
+            echo "❌ Error: Unable to extract JSON body"
+            exit 1
+        fi
 
-        # Extract the assessment and reason from JSON
+        # Extract assessment and reason using regex
         ASSESSMENT=$(echo "$JSON_BODY" | sed -n 's/.*"assessment": *"\([^"]*\)".*/\1/p')
         REASON=$(echo "$JSON_BODY" | sed -n 's/.*"reason": *"\([^"]*\)".*/\1/p')
+
+        # Ensure values are extracted correctly
+        if [ -z "$ASSESSMENT" ] || [ -z "$REASON" ]; then
+            echo "❌ Error: Failed to extract 'assessment' or 'reason'"
+            exit 1
+        fi
 
         # Print extracted values
         echo "Assessment: $ASSESSMENT"
