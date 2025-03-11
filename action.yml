@@ -1,15 +1,14 @@
-name: "Check file with Webhook"
-description: "Check file for expected changes and send content to a webhook."
+name: Check file with Webhook
 
 on:
   workflow_call:
     outputs:
-      assessment:
+      solutionassessment:
         description: "Assessment"
-        value: ${{ jobs.check_solution.outputs.assessment }}
-      reason:
+        value: ${{ jobs.check_solution.outputs.solutionassessment }}
+      solutionreason:
         description: "Reason"
-        value: ${{ jobs.check_solution.outputs.reason }}
+        value: ${{ jobs.check_solution.outputs.solutionreason }}
 
 jobs:
   check_solution:
@@ -35,8 +34,8 @@ jobs:
         description: "Account SID for Twilio authentication."
         required: true
     outputs:
-      assessment: ${{ steps.step1.outputs.assessment }}
-      reason: ${{ steps.step1.outputs.reason }}
+      solutionassessment: ${{ steps.step1.outputs.assessment }}
+      solutionreason: ${{ steps.step1.outputs.reason }}
     steps:
       - shell: bash
       - id: step1
