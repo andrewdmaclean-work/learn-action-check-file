@@ -102,36 +102,21 @@ runs:
       echo "Response Body: $BODY"
 
       if [ "$HTTP_CODE" -eq 200 ]; then
-         echo "✅ Request successfully sent to webhook"
+        echo "✅ Request successfully sent to webhook"
 
-        # Extract JSON from the response body
-        JSON_BODY=$(echo "$BODY" | sed -n 's/.*"body": *"\([^}]*\)}.*/\1}/p')
-
-        # Ensure JSON_BODY is not empty
-        if [ -z "$JSON_BODY" ]; then
-            echo "❌ Error: Unable to extract JSON body"
-            exit 1
-        fi
-
-        # Extract assessment and reason using regex
-        ASSESSMENT=$(echo "$JSON_BODY" | sed -n 's/.*"assessment": *"\([^"]*\)".*/\1/p')
-        REASON=$(echo "$JSON_BODY" | sed -n 's/.*"reason": *"\([^"]*\)".*/\1/p')
-
-        # Ensure values are extracted correctly
-        if [ -z "$ASSESSMENT" ] || [ -z "$REASON" ]; then
-            echo "❌ Error: Failed to extract 'assessment' or 'reason'"
-            exit 1
-        fi
-
-        # Print extracted values
-        echo "Assessment: $ASSESSMENT"
-        echo "Reason: $REASON"
-
-        # Store in environment variables
-        echo "assessment=$ASSESSMENT" >> "$GITHUB_ENV"
-        echo "reason=$REASON" >> "$GITHUB_ENV"
+        # Store response in GitHub environment for later extraction
+        echo "response=$BODY" >> $GITHUB_ENV
 
       else
         echo "❌ Failed to send request to webhook. HTTP status code: $HTTP_CODE"
         exit 1
       fi
+
+  - name: Extract Assessment and Reason
+    shell: bash
+    run: |
+      echo "Assessment: ${{ fromJSON(env.response).body | fromJSON().assessment }}"
+      echo "Reason: ${{ fromJSON(env.response).body | fromJSON().reason }}"
+
+      echo "assessment=${{ fromJSON(env.response).body | fromJSON().assessment }}" >> $GITHUB_ENV
+      echo "reason=${{ fromJSON(env.response).body | fromJSON().reason }}" >> $GITHUB_ENV
