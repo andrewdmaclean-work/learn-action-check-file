@@ -104,22 +104,25 @@ runs:
       if [ "$HTTP_CODE" -eq 200 ]; then
         echo "✅ Request successfully sent to webhook"
 
-        # Store response in GitHub environment for later extraction
-        echo "response=$BODY" >> $GITHUB_ENV
+       # Parsing the response right after a successful call
+      echo "Parsing Response"
+
+      # Extract the nested JSON string from the "body" field using jq
+      JSON_BODY=$(echo "$BODY" | jq -r '.body')
+
+      # Parse the assessment and reason from the nested JSON using jq
+      ASSESSMENT=$(echo "$JSON_BODY" | jq -r '.assessment')
+      REASON=$(echo "$JSON_BODY" | jq -r '.reason')
+
+      # Print extracted values
+      echo "Assessment: $ASSESSMENT"
+      echo "Reason: $REASON"
+
+      # Store in environment variables
+      echo "assessment=$ASSESSMENT" >> "$GITHUB_ENV"
+      echo "reason=$REASON" >> "$GITHUB_ENV"
+
       else
         echo "❌ Failed to send request to webhook. HTTP status code: $HTTP_CODE"
         exit 1
       fi
-
-  - name: Extract Assessment and Reason
-    shell: bash
-    run: |
-      # Extract `body` JSON string
-      BODY_JSON='${{ fromJSON(env.response).body }}'
-
-      # Store parsed JSON in environment variables
-      echo "assessment=${{ fromJSON(BODY_JSON).assessment }}" >> $GITHUB_ENV
-      echo "reason=${{ fromJSON(BODY_JSON).reason }}" >> $GITHUB_ENV
-
-      echo "Assessment: ${{ fromJSON(BODY_JSON).assessment }}"
-      echo "Reason: ${{ fromJSON(BODY_JSON).reason }}"
