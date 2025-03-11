@@ -54,13 +54,17 @@ runs:
         fi
       done
 
+      # Read and format the content with titles
       echo "Reading file contents"
-      step_content=$(cat "$STEPFILE" | tr -d '\n' | sed 's/"/\\"/g')
-      submission_content=$(cat "$SUBMISSIONFILE" | tr -d '\n' | sed 's/"/\\"/g')
-      solution_content=$(cat "$SOLUTIONFILE" | tr -d '\n' | sed 's/"/\\"/g')
+      step_content=$(cat "$STEPFILE" | sed 's/"/\\"/g')
+      submission_content=$(cat "$SUBMISSIONFILE" | sed 's/"/\\"/g')
+      solution_content=$(cat "$SOLUTIONFILE" | sed 's/"/\\"/g')
+
+      # Concatenate with titles and delimiters if needed
+      all_content="Instructions: ${step_content}\nSolution: ${solution_content}\nSubmission: ${submission_content}"
 
       # Construct JSON manually with properly escaped `body` as a string
-      JSON_PAYLOAD="{\"identity\": \"email:${GITHUB_USER_EMAIL}\", \"session_id\": \"mysession\", \"body\": \"{ \\\"step\\\": \\\"$step_content\\\", \\\"submission\\\": \\\"$submission_content\\\", \\\"solution\\\": \\\"$solution_content\\\" }\" }"
+      JSON_PAYLOAD="{\"identity\": \"email:${GITHUB_USER_EMAIL}\", \"session_id\": \"mysession\", \"body\": \"${all_content}\"}"
 
       echo "Sending request to $WEBHOOKURL"
 
@@ -77,9 +81,8 @@ runs:
       # Execute the stored curl command and capture the response
       RESPONSE=$(eval "$CURL_COMMAND")
 
-      # Extract the HTTP status code (last line)
+      # Extract the HTTP status code (last line) and body (everything else)
       HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-      # Extract the JSON body (all lines except the last)
       BODY=$(echo "$RESPONSE" | sed '$d')
 
       # Print debugging information
@@ -88,25 +91,26 @@ runs:
 
       if [ "$HTTP_CODE" -eq 200 ]; then
         echo "✅ Request successfully sent to webhook"
-        echo "response=$BODY" >> "$GITHUB_ENV"
+
+        # Parsing the response right after a successful call
+        echo "Parsing Structured Text Response"
+
+        # Extract the assessment and reason from plain text response
+        ASSESSMENT=$(echo "$BODY" | sed -n 's/^Assessment: \([^\.]*\)\..*/\1/p')
+        REASON=$(echo "$BODY" | sed -n 's/.*Reason: \(.*\)$/\1/p')
+
+        echo "Assessment: $ASSESSMENT"
+        echo "Reason: $REASON"
+
+        # Store in environment variables
+        echo "assessment=$ASSESSMENT" >> "$GITHUB_ENV"
+        echo "reason=$REASON" >> "$GITHUB_ENV"
+
+        # Set outputs directly
+        echo "assessment=$ASSESSMENT" >> "$GITHUB_OUTPUT"
+        echo "reason=$REASON" >> "$GITHUB_OUTPUT"
+
       else
         echo "❌ Failed to send request to webhook. HTTP status code: $HTTP_CODE"
         exit 1
       fi
-
-  - shell: bash
-    name: Parse JSON Response
-    id: parse_response
-    run: |
-      echo "Parsing JSON response"
-      echo "Assessment: ${{ fromJSON(env.response).assessment }}"
-      echo "Reason: ${{ fromJSON(env.response).reason }}"
-
-      echo "assessment=${{ fromJSON(env.response).assessment }}" >> "$GITHUB_ENV"
-      echo "reason=${{ fromJSON(env.response).reason }}" >> "$GITHUB_ENV"
-
-  - shell: bash
-    name: Set Outputs
-    run: |
-      echo "assessment=${{ env.assessment }}" >> "$GITHUB_OUTPUT"
-      echo "reason=${{ env.reason }}" >> "$GITHUB_OUTPUT"
