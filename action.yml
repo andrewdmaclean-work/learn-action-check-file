@@ -105,22 +105,22 @@ runs:
         echo "✅ Request successfully sent to webhook"
 
         # Parsing the response right after a successful call
-        echo "Parsing Structured Text Response"
+        echo "Parsing Response"
 
-        # Extract the assessment and reason from plain text response
-        ASSESSMENT=$(echo "$BODY" | sed -n 's/^Assessment: \([^\.]*\)\..*/\1/p')
-        REASON=$(echo "$BODY" | sed -n 's/.*Reason: \(.*\)$/\1/p')
+        # Extract JSON from the response body (removing markdown code block)
+        JSON_BODY=$(echo "$BODY" | sed -n 's/.*```json\(.*\)```/\1/p')
 
+        # Extract the assessment and reason from JSON
+        ASSESSMENT=$(echo "$JSON_BODY" | sed -n 's/.*"assessment": *"\([^"]*\)".*/\1/p')
+        REASON=$(echo "$JSON_BODY" | sed -n 's/.*"reason": *"\([^"]*\)".*/\1/p')
+
+        # Print extracted values
         echo "Assessment: $ASSESSMENT"
         echo "Reason: $REASON"
 
         # Store in environment variables
         echo "assessment=$ASSESSMENT" >> "$GITHUB_ENV"
         echo "reason=$REASON" >> "$GITHUB_ENV"
-
-        # Set outputs directly
-        echo "assessment=$ASSESSMENT" >> "$GITHUB_OUTPUT"
-        echo "reason=$REASON" >> "$GITHUB_OUTPUT"
 
       else
         echo "❌ Failed to send request to webhook. HTTP status code: $HTTP_CODE"
