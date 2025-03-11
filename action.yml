@@ -106,7 +106,6 @@ runs:
 
         # Store response in GitHub environment for later extraction
         echo "response=$BODY" >> $GITHUB_ENV
-
       else
         echo "❌ Failed to send request to webhook. HTTP status code: $HTTP_CODE"
         exit 1
@@ -115,8 +114,12 @@ runs:
   - name: Extract Assessment and Reason
     shell: bash
     run: |
-      echo "Assessment: ${{ fromJSON(env.response).body | fromJSON().assessment }}"
-      echo "Reason: ${{ fromJSON(env.response).body | fromJSON().reason }}"
+      # Extract `body` JSON string
+      BODY_JSON='${{ fromJSON(env.response).body }}'
 
-      echo "assessment=${{ fromJSON(env.response).body | fromJSON().assessment }}" >> $GITHUB_ENV
-      echo "reason=${{ fromJSON(env.response).body | fromJSON().reason }}" >> $GITHUB_ENV
+      # Store parsed JSON in environment variables
+      echo "assessment=${{ fromJSON(BODY_JSON).assessment }}" >> $GITHUB_ENV
+      echo "reason=${{ fromJSON(BODY_JSON).reason }}" >> $GITHUB_ENV
+
+      echo "Assessment: ${{ fromJSON(BODY_JSON).assessment }}"
+      echo "Reason: ${{ fromJSON(BODY_JSON).reason }}"
