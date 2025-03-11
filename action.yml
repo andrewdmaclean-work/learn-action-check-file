@@ -94,7 +94,8 @@ runs:
         exit 1
       fi
 
-  - name: Parse JSON Response
+  - shell: bash
+    name: Parse JSON Response
     id: parse_response
     run: |
       echo "Parsing JSON response"
@@ -104,7 +105,8 @@ runs:
       echo "assessment=${{ fromJSON(env.response).assessment }}" >> "$GITHUB_ENV"
       echo "reason=${{ fromJSON(env.response).reason }}" >> "$GITHUB_ENV"
 
-  - name: Set Outputs
+  - shell: bash
+    name: Set Outputs
     run: |
       echo "assessment=${{ env.assessment }}" >> "$GITHUB_OUTPUT"
       echo "reason=${{ env.reason }}" >> "$GITHUB_OUTPUT"
