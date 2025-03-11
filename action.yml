@@ -57,7 +57,8 @@ runs:
       # Function to clean file content
       clean_content() {
         if [ -f "$1" ]; then
-          cat "$1" | tr -d '\r' | sed 's/[[:space:]]\+/ /g' | sed '/^$/N;/^\n$/D' | sed 's/"/\\"/g'
+          # Read the content, remove carriage returns and excess spaces, and escape quotes
+          tr -d '\r\n' < "$1" | tr -s ' ' | sed 's/"/\\"/g'
         else
           echo "⚠️ File $1 not found"
         fi
@@ -69,12 +70,14 @@ runs:
       solution_content=$(clean_content "$SOLUTIONFILE")
       submission_content=$(clean_content "$SUBMISSIONFILE")
 
-      # Concatenate with titles
-      all_content="Instructions:\n${step_content}\n\nSolution:\n${solution_content}\n\nSubmission:\n${submission_content}"
+      # Concatenate with titles and format newlines to be JSON compatible
+      all_content=$(printf "Instructions: %s \\n\\nSolution: %s \\n\\nSubmission: %s" \
+        "$step_content" "$solution_content" "$submission_content")
 
-
-      # Construct JSON manually with properly escaped `body` as a string
-      JSON_PAYLOAD="{\"identity\": \"email:${GITHUB_USER_EMAIL}\", \"session_id\": \"mysession\", \"body\": \"${all_content}\"}"
+      # Create the JSON payload, correctly escaping special characters
+      JSON_PAYLOAD=$(printf '{"identity": "email:%s", "session_id": "mysession", "body": "%s"}' \
+        "${GITHUB_USER_EMAIL}" \
+        "${all_content}")
 
       echo "Sending request to $WEBHOOKURL"
 
