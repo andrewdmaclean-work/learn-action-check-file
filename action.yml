@@ -119,10 +119,10 @@ runs:
       echo "Reason: $REASON"
 
       # Output the assessment and reason as action outputs
-      echo "assessment=$ASSESSMENT" >> $GITHUB_OUTPUT
-      echo "reason=$REASON" >> $GITHUB_OUTPUT
+      echo "assessment=$ASSESSMENT" >> $GITHUB_ENV
+      echo "reason=$REASON" >> $GITHUB_ENV
 
-      cat $GITHUB_OUTPUT
+      cat $GITHUB_ENV
 
       else
         echo "❌ Failed to send request to webhook. HTTP status code: $HTTP_CODE"
