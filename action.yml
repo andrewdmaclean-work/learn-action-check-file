@@ -38,33 +38,22 @@ runs:
       GITHUB_USER_EMAIL: ${{ github.actor }}
       OUTPUT_ENV: $GITHUB_ENV
     run: |
-      echo "Checking that all required env variables are set"
+      echo "Checking that all required environment variables are set"
 
-      # Verify file existence
-      if [ ! -f "$STEPFILE" ]; then
-        echo "STEPFILE does not exist"
-        exit 1
-      fi
-      if [ ! -f "$SUBMISSIONFILE" ]; then
-        echo "SUBMISSIONFILE does not exist"
-        exit 1
-      fi
-      if [ ! -f "$SOLUTIONFILE" ]; then
-        echo "SOLUTIONFILE does not exist"
-        exit 1
-      fi
-      if [ -z "$WEBHOOKURL" ]; then
-        echo "WEBHOOKURL is unset or empty"
-        exit 1
-      fi
-      if [ -z "$AUTH_TOKEN" ]; then
-        echo "AUTH_TOKEN is unset or empty"
-        exit 1
-      fi
-      if [ -z "$ACCOUNT_SID" ]; then
-        echo "ACCOUNT_SID is unset or empty"
-        exit 1
-      fi
+      # Verify that required files exist
+      for file in "$STEPFILE" "$SUBMISSIONFILE" "$SOLUTIONFILE"; do
+        if [ ! -f "$file" ]; then
+          echo "Error: File $file does not exist"
+          exit 1
+        fi
+      done
+
+      for var in WEBHOOKURL AUTH_TOKEN ACCOUNT_SID; do
+        if [ -z "${!var}" ]; then
+          echo "Error: $var is unset or empty"
+          exit 1
+        fi
+      done
 
       echo "Reading file contents"
       step_content=$(<"$STEPFILE")
@@ -73,37 +62,51 @@ runs:
 
       echo "Sending request to $WEBHOOKURL"
 
-      RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$WEBHOOKURL" \
-        -H "Content-Type: application/json" \
-        -d '{
-          "identity": "email:'"${GITHUB_USER_EMAIL}"'",
-          "session_id": "mysession",
-          "body": {
-            "step": "'"${step_content}"'",
-            "submission": "'"${submission_content}"'",
-            "solution": "'"${solution_content}"'"
-          }
-        }' \
-        -u "$ACCOUNT_SID:$AUTH_TOKEN")
+      # Store the curl command in a variable
+      CURL_COMMAND="curl -s -w \"\n%{http_code}\" -X POST \"$WEBHOOKURL\" \
+        -H \"Content-Type: application/json\" \
+        -d '{\"identity\": \"email:${GITHUB_USER_EMAIL}\", \"session_id\": \"mysession\", \"body\": { \"step\": \"${step_content}\", \"submission\": \"${submission_content}\", \"solution\": \"${solution_content}\" }}' \
+        -u \"$ACCOUNT_SID:$AUTH_TOKEN\""
 
-      echo "Response: $RESPONSE"
+      # Echo the curl command for debugging
+      echo "Running the following cURL command:"
+      echo "$CURL_COMMAND"
 
-      HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
-      RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
+      # Execute the stored curl command and capture the response
+      RESPONSE=$(eval "$CURL_COMMAND")
 
-      if [ "$HTTP_STATUS" -eq 200 ]; then
+      # Extract the HTTP status code (last line)
+      HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+      # Extract the JSON body (all lines except the last)
+      BODY=$(echo "$RESPONSE" | sed '$d')
+
+      # Print debugging information
+      echo "HTTP Status Code: $HTTP_CODE"
+      echo "Response Body: $BODY"
+
+      if [ "$HTTP_CODE" -eq 200 ]; then
         echo "Request successfully sent to webhook"
-        echo "Response body: $RESPONSE_BODY"
 
-        ASSESSMENT=$(echo "$RESPONSE_BODY" | jq -r '.assessment')
-        REASON=$(echo "$RESPONSE_BODY" | jq -r '.reason')
+        # Ensure jq is installed
+        if ! command -v jq &> /dev/null; then
+          echo "Installing jq..."
+          sudo apt-get update && sudo apt-get install -y jq
+        fi
 
-        # Set outputs for the action
-        echo "assessment=$ASSESSMENT" >> $OUTPUT_ENV
-        echo "reason=$REASON" >> $OUTPUT_ENV
+        # Extract assessment and reason from JSON response
+        ASSESSMENT=$(echo "$BODY" | jq -r '.assessment')
+        REASON=$(echo "$BODY" | jq -r '.reason')
+
+        # Print parsed values
+        echo "Assessment: $ASSESSMENT"
+        echo "Reason: $REASON"
+
+        # Set outputs for the GitHub Action
+        echo "assessment=$ASSESSMENT" >> "$OUTPUT_ENV"
+        echo "reason=$REASON" >> "$OUTPUT_ENV"
 
       else
-        echo "Failed to send request to webhook. HTTP status code: $HTTP_STATUS"
-        echo "Response body: $RESPONSE_BODY"
+        echo "❌ Failed to send request to webhook. HTTP status code: $HTTP_CODE"
+        echo "❌ Response body: $BODY"
         exit 1
       fi
