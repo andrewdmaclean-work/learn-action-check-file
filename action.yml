@@ -22,12 +22,15 @@ inputs:
 outputs:
   assessment:
     description: "True if the solution is correct"
+    value: ${{ steps.request.outputs.assessment }}
   reason:
     description: "Reason for assessment"
+    value: ${{ steps.request.outputs.reason }}
 runs:
   using: composite
   steps:
   - shell: bash
+  - id: request
     env:
       STEPFILE: ${{ inputs.step }}
       SUBMISSIONFILE: ${{ inputs.submission }}
@@ -119,8 +122,8 @@ runs:
       echo "Reason: $REASON"
 
       # Output the assessment and reason as action outputs
-      echo "assessment=$ASSESSMENT" >> $GITHUB_ENV
-      echo "reason=$REASON" >> $GITHUB_ENV
+      echo "assessment=$ASSESSMENT" >> $GITHUB_OUTPUT
+      echo "reason=$REASON" >> $GITHUB_OUTPUT
 
       cat $GITHUB_ENV
 
