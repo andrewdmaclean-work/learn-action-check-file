@@ -38,13 +38,6 @@ runs:
         fi
       done
 
-      for var in WEBHOOKURL; do
-        if [ -z "${!var}" ]; then
-          echo "❌ Error: $var is unset or empty"
-          exit 1
-        fi
-      done
-
       # Function to clean file content
       clean_content() {
         if [ -f "$1" ]; then
