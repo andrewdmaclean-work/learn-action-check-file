@@ -25,7 +25,7 @@ runs:
       STEPFILE: ${{ inputs.step }}
       SUBMISSIONFILE: ${{ inputs.submission }}
       SOLUTIONFILE: ${{ inputs.solution }}
-      WEBHOOKURL: ${{ vars.WEBHOOK_URL }}
+      WEBHOOKURL: ${{ secrets.WEBHOOK_URL }}
       GITHUB_USER_EMAIL: ${{ github.actor }}
     shell: bash
     run: |
