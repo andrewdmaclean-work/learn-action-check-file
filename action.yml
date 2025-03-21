@@ -25,7 +25,6 @@ runs:
       STEPFILE: ${{ inputs.step }}
       SUBMISSIONFILE: ${{ inputs.submission }}
       SOLUTIONFILE: ${{ inputs.solution }}
-      WEBHOOKURL: ${{ secrets.WEBHOOK_URL }}
       GITHUB_USER_EMAIL: ${{ github.actor }}
     shell: bash
     run: |
@@ -74,7 +73,7 @@ runs:
         "${ASSESSMENT_CONTENT}")
       
       # Append the encrypted username to the WEBHOOKURL
-      WEBHOOKURL_WITH_ID="$WEBHOOKURL?id=$ENCRYPTED_ID"
+      WEBHOOKURL_WITH_ID="${{ vars.WEBHOOK_URL }}?id=$ENCRYPTED_ID"
       
       echo "Sending request to $WEBHOOKURL_WITH_ID"
       
