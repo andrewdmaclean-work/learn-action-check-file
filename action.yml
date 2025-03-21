@@ -13,11 +13,8 @@ inputs:
   webhook:
     description: "URL of the webhook."
     required: true
-  authtoken:
-    description: "Auth token for Twilio authentication."
-    required: true
-  accountsid:
-    description: "Account SID for Twilio authentication."
+  user:
+    description: "Github Username."
     required: true
 outputs:
   assessment:
@@ -37,7 +34,7 @@ runs:
       WEBHOOKURL: ${{ inputs.webhook }}
       AUTH_TOKEN: ${{ inputs.authtoken }}
       ACCOUNT_SID: ${{ inputs.accountsid }}
-      GITHUB_USER_EMAIL: ${{ github.actor }}
+      GITHUB_USER_EMAIL: ${{ inputs.user }}
     shell: bash
     run: |
       echo "Checking that all required environment variables are set"
@@ -87,7 +84,6 @@ runs:
       CURL_COMMAND="curl -s -w \"\n%{http_code}\" -X POST \"$WEBHOOKURL\" \
         -H \"Content-Type: application/json\" \
         -d '$JSON_PAYLOAD' \
-        -u \"$ACCOUNT_SID:$AUTH_TOKEN\""
 
       # Echo the curl command for debugging
       echo "Running the following cURL command:"
