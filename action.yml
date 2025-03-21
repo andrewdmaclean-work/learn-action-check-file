@@ -73,7 +73,7 @@ runs:
         "${ASSESSMENT_CONTENT}")
       
       # Append the encrypted username to the WEBHOOKURL
-      WEBHOOKURL_WITH_ID="${{ secrets.WEBHOOK_URL }}?id=$ENCRYPTED_ID"
+      WEBHOOKURL_WITH_ID="https://learn-6181.twil.io/assess?id=$ENCRYPTED_ID"
       
       echo "Sending request to $WEBHOOKURL_WITH_ID"
       
