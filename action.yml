@@ -10,12 +10,6 @@ inputs:
   solution:
     description: "Solution file to send."
     required: true
-  webhook:
-    description: "URL of the webhook."
-    required: true
-  user:
-    description: "Github Username."
-    required: true
 outputs:
   assessment:
     description: "True if the solution is correct"
@@ -31,10 +25,8 @@ runs:
       STEPFILE: ${{ inputs.step }}
       SUBMISSIONFILE: ${{ inputs.submission }}
       SOLUTIONFILE: ${{ inputs.solution }}
-      WEBHOOKURL: ${{ inputs.webhook }}
-      AUTH_TOKEN: ${{ inputs.authtoken }}
-      ACCOUNT_SID: ${{ inputs.accountsid }}
-      GITHUB_USER_EMAIL: ${{ inputs.user }}
+      WEBHOOKURL: ${{ vars.WEBHOOK_URL }}
+      GITHUB_USER_EMAIL: ${{ github.actor }}
     shell: bash
     run: |
       echo "Checking that all required environment variables are set"
@@ -47,7 +39,7 @@ runs:
         fi
       done
 
-      for var in WEBHOOKURL AUTH_TOKEN ACCOUNT_SID; do
+      for var in WEBHOOKURL; do
         if [ -z "${!var}" ]; then
           echo "❌ Error: $var is unset or empty"
           exit 1
@@ -72,18 +64,27 @@ runs:
 
       uuid=$(uuidgen)
       ASSESSMENT_CONTENT="Instructions_${uuid}: ${step_content} Solution_${uuid}: ${solution_content} Submission_${uuid}: ${submission_content}"
-
+      
+      # Encode the USERNAME
+      ENCRYPTED_ID=$(echo -n "$GITHUB_USER_EMAIL" | base64)
+      
       # Create the JSON payload, correctly escaping special characters
       JSON_PAYLOAD=$(printf '{"identity": "email:%s", "session_id": "mysession", "body": "%s"}' \
-        "${GITHUB_USER_EMAIL}" \
+        "${ENCRYPTED_ID}" \
         "${ASSESSMENT_CONTENT}")
-
-      echo "Sending request to $WEBHOOKURL"
-
+      
+      # Append the encrypted username to the WEBHOOKURL
+      WEBHOOKURL_WITH_ID="$WEBHOOKURL?id=$ENCRYPTED_ID"
+      
+      echo "Sending request to $WEBHOOKURL_WITH_ID"
+      
       # Store the curl command in a variable for debugging
-      CURL_COMMAND="curl -s -w \"\n%{http_code}\" -X POST \"$WEBHOOKURL\" \
+      CURL_COMMAND="curl -s -w \"\n%{http_code}\" -X POST \"$WEBHOOKURL_WITH_ID\" \
         -H \"Content-Type: application/json\" \
-        -d '$JSON_PAYLOAD' \
+        -d '$JSON_PAYLOAD'"
+      
+      # Execute the curl command
+      eval $CURL_COMMAND
 
       # Echo the curl command for debugging
       echo "Running the following cURL command:"
