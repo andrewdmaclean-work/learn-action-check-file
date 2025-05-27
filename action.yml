@@ -20,106 +20,100 @@ outputs:
 runs:
   using: "composite"
   steps:
-  - id: request
-    env:
-      STEPFILE: ${{ inputs.step }}
-      SUBMISSIONFILE: ${{ inputs.submission }}
-      SOLUTIONFILE: ${{ inputs.solution }}
-      GITHUB_USER_EMAIL: ${{ github.actor }}
-    shell: bash
-    run: |
-      echo "Checking that all required environment variables are set"
+    - id: request
+      env:
+        STEPFILE: ${{ inputs.step }}
+        SUBMISSIONFILE: ${{ inputs.submission }}
+        SOLUTIONFILE: ${{ inputs.solution }}
+        GITHUB_USER_EMAIL: ${{ github.actor }}
+      shell: bash
+      run: |
+        echo "Checking that all required environment variables are set"
 
-      # Verify required files exist
-      for file in "$STEPFILE" "$SUBMISSIONFILE" "$SOLUTIONFILE"; do
-        if [ ! -f "$file" ]; then
-          echo "❌ Error: File $file does not exist"
+        # Verify required files exist
+        for file in "$STEPFILE" "$SUBMISSIONFILE" "$SOLUTIONFILE"; do
+          if [ ! -f "$file" ]; then
+            echo "❌ Error: File $file does not exist"
+            exit 1
+          fi
+        done
+
+        # Function to clean file content
+        clean_content() {
+          if [ -f "$1" ]; then
+            # Read the content, remove carriage returns and excess spaces, and escape quotes
+            tr -d '\r\n' < "$1" | tr -s ' ' | sed 's/"/\\"/g'
+          else
+            echo "⚠️ File $1 not found"
+          fi
+        }
+
+        # Read and clean file contents
+        echo "Reading and formatting file contents..."
+        step_content=$(clean_content "$STEPFILE")
+        solution_content=$(clean_content "$SOLUTIONFILE")
+        submission_content=$(clean_content "$SUBMISSIONFILE")
+
+        uuid=$(uuidgen)
+        ASSESSMENT_CONTENT="Instructions_${uuid}: ${step_content} Solution_${uuid}: ${solution_content} Submission_${uuid}: ${submission_content}"
+        
+        # Encode the USERNAME
+        ENCRYPTED_ID=$(echo -n "$GITHUB_USER_EMAIL" | base64)
+        
+        # Create the JSON payload, correctly escaping special characters
+        JSON_PAYLOAD=$(printf '{"identity": "email:%s", "session_id": "mysession", "body": "%s"}' \
+          "${ENCRYPTED_ID}" \
+          "${ASSESSMENT_CONTENT}")
+          
+        # Append the encrypted username to the WEBHOOKURL
+        WEBHOOKURL_WITH_ID="https://learn-6181.twil.io/assess?id=$ENCRYPTED_ID"
+        
+        echo "Sending request to $WEBHOOKURL_WITH_ID"
+
+        echo "JSON_PAYLOAD:"
+        echo "$JSON_PAYLOAD"
+        
+        # Execute the curl command directly (NO eval!)
+        RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$WEBHOOKURL_WITH_ID" \
+          -H "Content-Type: application/json" \
+          -d "$JSON_PAYLOAD")
+
+        # For debugging, print what would have been the curl command
+        echo "Running (no eval) the following curl command:"
+        echo "curl -s -w \"\\n%{http_code}\" -X POST \"$WEBHOOKURL_WITH_ID\" -H \"Content-Type: application/json\" -d '$JSON_PAYLOAD'"
+
+        # Extract the HTTP status code (last line) and body (everything else)
+        HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+        BODY=$(echo "$RESPONSE" | sed '$d')
+
+        # Print debugging information
+        echo "HTTP Status Code: $HTTP_CODE"
+        echo "Response Body: $BODY"
+
+        if [ "$HTTP_CODE" -eq 200 ]; then
+          echo "✅ Request successfully sent to webhook"
+
+          # Parsing the response
+          echo "Parsing Response"
+
+          # Extract the nested JSON string from the "body" field using jq
+          JSON_BODY=$(echo "$BODY" | jq -r '.body')
+
+          # Parse the assessment and reason from the nested JSON using jq
+          ASSESSMENT=$(echo "$JSON_BODY" | jq -r '.assessment')
+          REASON=$(echo "$JSON_BODY" | jq -r '.reason')
+
+          # Print extracted values
+          echo "Assessment: $ASSESSMENT"
+          echo "Reason: $REASON"
+
+          # Output the assessment and reason as action outputs
+          echo "assessment=$ASSESSMENT" >> $GITHUB_OUTPUT
+          echo "reason=$REASON" >> $GITHUB_OUTPUT
+
+          cat $GITHUB_ENV
+
+        else
+          echo "❌ Failed to send request to webhook. HTTP status code: $HTTP_CODE"
           exit 1
         fi
-      done
-
-      # Function to clean file content
-      clean_content() {
-        if [ -f "$1" ]; then
-          # Read the content, remove carriage returns and excess spaces, and escape quotes
-          tr -d '\r\n' < "$1" | tr -s ' ' | sed 's/"/\\"/g'
-        else
-          echo "⚠️ File $1 not found"
-        fi
-      }
-
-      # Read and clean file contents
-      echo "Reading and formatting file contents..."
-      step_content=$(clean_content "$STEPFILE")
-      solution_content=$(clean_content "$SOLUTIONFILE")
-      submission_content=$(clean_content "$SUBMISSIONFILE")
-
-      uuid=$(uuidgen)
-      ASSESSMENT_CONTENT="Instructions_${uuid}: ${step_content} Solution_${uuid}: ${solution_content} Submission_${uuid}: ${submission_content}"
-      
-      # Encode the USERNAME
-      ENCRYPTED_ID=$(echo -n "$GITHUB_USER_EMAIL" | base64)
-      
-      # Create the JSON payload, correctly escaping special characters
-      JSON_PAYLOAD=$(printf '{"identity": "email:%s", "session_id": "mysession", "body": "%s"}' \
-        "${ENCRYPTED_ID}" \
-        "${ASSESSMENT_CONTENT}")
-      
-      # Append the encrypted username to the WEBHOOKURL
-      WEBHOOKURL_WITH_ID="https://learn-6181.twil.io/assess?id=$ENCRYPTED_ID"
-      
-      echo "Sending request to $WEBHOOKURL_WITH_ID"
-      
-      # Store the curl command in a variable for debugging
-      CURL_COMMAND="curl -s -w \"\n%{http_code}\" -X POST \"$WEBHOOKURL_WITH_ID\" \
-        -H \"Content-Type: application/json\" \
-        -d '$JSON_PAYLOAD'"
-
-      echo "JSON_PAYLOAD:"
-      echo "$JSON_PAYLOAD"
-      
-      # Execute the curl command
-      eval $CURL_COMMAND
-
-      # Echo the curl command for debugging
-      echo "Running the following cURL command:"
-      echo "$CURL_COMMAND"
-
-      # Execute the stored curl command and capture the response
-      RESPONSE=$(eval "$CURL_COMMAND")
-
-      # Extract the HTTP status code (last line) and body (everything else)
-      HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-      BODY=$(echo "$RESPONSE" | sed '$d')
-
-      # Print debugging information
-      echo "HTTP Status Code: $HTTP_CODE"
-      echo "Response Body: $BODY"
-
-      if [ "$HTTP_CODE" -eq 200 ]; then
-        echo "✅ Request successfully sent to webhook"
-
-       # Parsing the response right after a successful call
-      echo "Parsing Response"
-
-      # Extract the nested JSON string from the "body" field using jq
-      JSON_BODY=$(echo "$BODY" | jq -r '.body')
-
-      # Parse the assessment and reason from the nested JSON using jq
-      ASSESSMENT=$(echo "$JSON_BODY" | jq -r '.assessment')
-      REASON=$(echo "$JSON_BODY" | jq -r '.reason')
-
-      # Print extracted values
-      echo "Assessment: $ASSESSMENT"
-      echo "Reason: $REASON"
-
-      # Output the assessment and reason as action outputs
-      echo "assessment=$ASSESSMENT" >> $GITHUB_OUTPUT
-      echo "reason=$REASON" >> $GITHUB_OUTPUT
-
-      cat $GITHUB_ENV
-
-      else
-        echo "❌ Failed to send request to webhook. HTTP status code: $HTTP_CODE"
-        exit 1
-      fi
