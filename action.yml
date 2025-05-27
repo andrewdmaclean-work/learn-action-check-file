@@ -74,6 +74,9 @@ runs:
       CURL_COMMAND="curl -s -w \"\n%{http_code}\" -X POST \"$WEBHOOKURL_WITH_ID\" \
         -H \"Content-Type: application/json\" \
         -d '$JSON_PAYLOAD'"
+
+      echo "JSON_PAYLOAD:"
+      echo "$JSON_PAYLOAD"
       
       # Execute the curl command
       eval $CURL_COMMAND
